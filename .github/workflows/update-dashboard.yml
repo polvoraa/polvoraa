@@ -1,0 +1,35 @@
+name: Update GitHub Apple Dashboard
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-dashboard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate SVG
+        run: npm run generate
+
+      - name: Commit updated dashboard
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update profile dashboard"
+          file_pattern: profile-dashboard.svg

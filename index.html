@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1600, initial-scale=1.0" />
+    <title>GitHub Apple Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main id="dashboard" class="dashboard" aria-label="GitHub Apple Dashboard">
+      <div class="ambient ambient-one"></div>
+      <div class="ambient ambient-two"></div>
+
+      <section class="hero glass-panel">
+        <div class="identity">
+          <div class="avatar-shell">
+            <img id="avatar" class="avatar" alt="GitHub profile photo" />
+            <div class="avatar-ring"></div>
+          </div>
+          <div>
+            <p class="eyebrow">GitHub Profile</p>
+            <h1 id="name">Matheus Saraiva</h1>
+            <p id="title" class="title">Creative Developer & Founder at Nova Studio</p>
+            <p id="bio" class="bio">Building digital experiences through design, development and AI.</p>
+          </div>
+        </div>
+        <div class="hero-meta">
+          <span id="usernameLabel">@SEU_USUARIO</span>
+          <span id="locationLabel">Remote Studio</span>
+        </div>
+      </section>
+
+      <section class="stats" aria-label="Quick stats">
+        <article class="stat-card glass-panel">
+          <span class="micro-line"></span>
+          <strong id="reposCount">0</strong>
+          <p>Public Repositories</p>
+        </article>
+        <article class="stat-card glass-panel">
+          <span class="micro-line"></span>
+          <strong id="followersCount">0</strong>
+          <p>Followers</p>
+        </article>
+        <article class="stat-card glass-panel">
+          <span class="micro-line"></span>
+          <strong id="followingCount">0</strong>
+          <p>Following</p>
+        </article>
+        <article class="stat-card glass-panel">
+          <span class="micro-line"></span>
+          <strong id="starsCount">0</strong>
+          <p>Stars Received</p>
+        </article>
+        <article class="stat-card glass-panel">
+          <span class="micro-line"></span>
+          <strong id="commitsCount">0</strong>
+          <p>Total Commits</p>
+        </article>
+      </section>
+
+      <section class="overview glass-panel">
+        <div class="section-heading">
+          <p class="eyebrow">Contribution Overview</p>
+          <h2>Activity, quietly composed.</h2>
+        </div>
+        <div id="heatmap" class="heatmap" aria-label="GitHub contribution heatmap"></div>
+      </section>
+
+      <section class="focus glass-panel">
+        <div class="section-heading">
+          <p class="eyebrow">Current Focus</p>
+          <h2>Design meets engineering.</h2>
+        </div>
+        <div class="focus-list">
+          <article class="focus-item">
+            <div><strong>Design</strong><span>Product polish</span></div>
+            <div class="progress"><span style="--value: 82%"></span></div>
+          </article>
+          <article class="focus-item">
+            <div><strong>Development</strong><span>Interface systems</span></div>
+            <div class="progress"><span style="--value: 91%"></span></div>
+          </article>
+          <article class="focus-item">
+            <div><strong>Artificial Intelligence</strong><span>Creative automation</span></div>
+            <div class="progress"><span style="--value: 74%"></span></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="projects glass-panel">
+        <div class="section-heading">
+          <p class="eyebrow">Featured Projects</p>
+          <h2>Selected repositories.</h2>
+        </div>
+        <div id="projectsGrid" class="projects-grid"></div>
+      </section>
+
+      <section class="stack glass-panel">
+        <div class="section-heading">
+          <p class="eyebrow">Tech Stack</p>
+          <h2>Tools with restraint.</h2>
+        </div>
+        <div id="techGrid" class="tech-grid"></div>
+      </section>
+
+      <footer class="footer">Designed and built by Matheus Saraiva</footer>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
