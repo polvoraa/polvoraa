@@ -1,5 +1,6 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { execFileSync } = require("node:child_process");
 const puppeteer = require("puppeteer");
 const { PNG } = require("pngjs");
 const { GIFEncoder, quantize, applyPalette } = require("gifenc");
@@ -79,7 +80,12 @@ async function fetchText(url) {
 
 async function loadGitHubData() {
   if (!USERNAME || USERNAME === "SEU_USUARIO") {
-    return { profile: fallbackProfile, repos: fallbackRepos, levels: [] };
+    return {
+      profile: fallbackProfile,
+      repos: fallbackRepos,
+      contributionDays: new Map(),
+      repoCommitDays: new Map(),
+    };
   }
 
   const [profile, repos, contributionsHtml] = await Promise.all([
@@ -88,44 +94,81 @@ async function loadGitHubData() {
     fetchText(`https://github.com/users/${USERNAME}/contributions`),
   ]);
 
-  return { profile, repos, levels: parseContributionLevels(contributionsHtml) };
+  return {
+    profile,
+    repos,
+    contributionDays: parseContributionDays(contributionsHtml),
+    repoCommitDays: loadRepoCommitDays(),
+  };
 }
 
 function getTotalStars(repos) {
   return repos.reduce((sum, repo) => sum + (repo.stargazers_count || 0), 0);
 }
 
-function parseContributionLevels(html) {
-  const cells = [];
+function parseContributionDays(html) {
+  const days = new Map();
   const regex = /data-date="(\d{4}-\d{2}-\d{2})"[^>]*data-level="(\d)"/g;
   let match;
 
   while ((match = regex.exec(html)) !== null) {
-    cells.push({ date: match[1], level: Number(match[2]) });
+    days.set(match[1], Number(match[2]));
   }
 
-  cells.sort((a, b) => a.date.localeCompare(b.date));
-
-  const normalized = cells.map((cell) => cell.level);
-  const expected = BOARD_COLS * BOARD_ROWS;
-  if (normalized.length >= expected) {
-    return normalized.slice(normalized.length - expected);
-  }
-
-  return [...Array(expected - normalized.length).fill(0), ...normalized];
+  return days;
 }
 
-function buildActivityLevels(levels, repos) {
-  if (levels.length) {
-    return levels.slice(0, BOARD_COLS * BOARD_ROWS);
+function loadRepoCommitDays() {
+  try {
+    const output = execFileSync("git", ["log", "--since=365 days ago", "--pretty=format:%ad", "--date=short"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+
+    const days = new Map();
+    if (!output) {
+      return days;
+    }
+
+    output.split(/\r?\n/).forEach((date) => {
+      if (!date) return;
+      days.set(date, (days.get(date) || 0) + 1);
+    });
+
+    return days;
+  } catch {
+    return new Map();
+  }
+}
+
+function buildDateKeys(daysCount) {
+  const keys = [];
+  const today = new Date();
+
+  for (let offset = daysCount - 1; offset >= 0; offset -= 1) {
+    const day = new Date(today);
+    day.setDate(today.getDate() - offset);
+    keys.push(day.toISOString().slice(0, 10));
   }
 
-  const fallback = [];
-  for (let index = 0; index < BOARD_COLS * BOARD_ROWS; index += 1) {
+  return keys;
+}
+
+function buildActivityLevels(contributionDays, repoCommitDays, repos) {
+  const expected = BOARD_COLS * BOARD_ROWS;
+  const fallback = buildDateKeys(expected).map((_, index) => {
     const repoSignal = repos[index % Math.max(repos.length, 1)]?.stargazers_count || 0;
-    fallback.push((index * 7 + repoSignal) % 5);
-  }
-  return fallback;
+    return (index * 7 + repoSignal) % 5;
+  });
+
+  const levels = buildDateKeys(expected).map((date, index) => {
+    const contributionLevel = contributionDays.get(date) || 0;
+    const repoCommits = repoCommitDays.get(date) || 0;
+    const repoLevel = Math.min(4, Math.ceil(repoCommits / 2));
+    return Math.max(contributionLevel, repoLevel, fallback[index]);
+  });
+
+  return levels;
 }
 
 function buildPathPoints() {
@@ -259,13 +302,14 @@ function formatNumber(value) {
 }
 
 async function main() {
-  const { profile, repos, levels: contributionLevels } = await loadGitHubData().catch(() => ({
+  const { profile, repos, contributionDays, repoCommitDays } = await loadGitHubData().catch(() => ({
     profile: fallbackProfile,
     repos: fallbackRepos,
-    levels: [],
+    contributionDays: new Map(),
+    repoCommitDays: new Map(),
   }));
 
-  const levels = buildActivityLevels(contributionLevels, repos);
+  const levels = buildActivityLevels(contributionDays, repoCommitDays, repos);
   const points = buildPathPoints();
 
   const browser = await puppeteer.launch({
