@@ -1,4 +1,9 @@
 <p align="center">
+  <img src="./dashboard-preview.png" alt="GitHub snake contribution graph" width="100%" />
+</p>
+
+
+<p align="center">
   <img src="./profile-snake.gif" alt="GitHub snake contribution graph" width="100%" />
 </p>
 

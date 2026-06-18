@@ -8,10 +8,10 @@ const { GIFEncoder, quantize, applyPalette } = require("gifenc");
 const USERNAME = "polvoraa";
 const WIDTH = 1280;
 const HEIGHT = 540;
-const FRAME_COUNT = 260;
-const FRAME_MS = 72;
+const FRAME_COUNT = 180;
+const FRAME_MS = 80;
 const OUTPUT_PATH = path.join(__dirname, "profile-snake.gif");
-const TARGET_LIMIT = 12;
+const TARGET_LIMIT = 8;
 
 const BOARD_COLS = 8;
 const BOARD_ROWS = 13;
@@ -85,7 +85,7 @@ async function loadGitHubData() {
       profile: fallbackProfile,
       repos: fallbackRepos,
       contributionDays: new Map(),
-      repoCommitDays: new Map(),
+      repoCommits: [],
     };
   }
 
@@ -99,7 +99,7 @@ async function loadGitHubData() {
     profile,
     repos,
     contributionDays: parseContributionDays(contributionsHtml),
-    repoCommitDays: loadRepoCommitDays(),
+    repoCommits: loadRepoCommits(),
   };
 }
 
@@ -119,26 +119,26 @@ function parseContributionDays(html) {
   return days;
 }
 
-function loadRepoCommitDays() {
+function loadRepoCommits() {
   try {
-    const output = execFileSync("git", ["log", "--since=365 days ago", "--pretty=format:%ad", "--date=short"], {
+    const output = execFileSync("git", ["log", "--since=365 days ago", "--pretty=format:%ad|%H", "--date=short"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
 
-    const days = new Map();
     if (!output) {
-      return days;
+      return [];
     }
 
-    output.split(/\r?\n/).forEach((date) => {
-      if (!date) return;
-      days.set(date, (days.get(date) || 0) + 1);
-    });
-
-    return days;
+    return output
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => {
+        const [date, sha] = line.split("|");
+        return { date, sha };
+      });
   } catch {
-    return new Map();
+    return [];
   }
 }
 
@@ -155,15 +155,19 @@ function buildDateKeys(daysCount) {
   return keys;
 }
 
-function buildActivityCells(contributionDays, repoCommitDays, repos) {
+function buildActivityCells(contributionDays, repoCommits, repos) {
   const expected = BOARD_COLS * BOARD_ROWS;
   const dates = buildDateKeys(expected);
+  const repoCommitDays = repoCommits.reduce((days, commit) => {
+    days.set(commit.date, (days.get(commit.date) || 0) + 1);
+    return days;
+  }, new Map());
 
   return dates.map((date, index) => {
     const repoSignal = repos[index % Math.max(repos.length, 1)]?.stargazers_count || 0;
     const contributionLevel = contributionDays.get(date) || 0;
     const repoCommits = repoCommitDays.get(date) || 0;
-    const repoLevel = Math.min(4, Math.ceil(repoCommits / 4));
+    const repoLevel = Math.min(4, Math.ceil(repoCommits / 3));
     const actualLevel = repoLevel;
     const fallbackLevel = (index * 7 + repoSignal) % 5;
 
@@ -177,57 +181,61 @@ function buildActivityCells(contributionDays, repoCommitDays, repos) {
   });
 }
 
+function buildBoardCycle() {
+  const indices = [];
+  for (let row = 0; row < BOARD_ROWS; row += 1) {
+    const cols = row % 2 === 0 ? [...Array(BOARD_COLS).keys()] : [...Array(BOARD_COLS).keys()].reverse();
+    cols.forEach((col) => {
+      indices.push(row * BOARD_COLS + col);
+    });
+  }
+  return indices;
+}
+
 function buildSnakeRoute(cells) {
-  const activeTargets = cells
+  const cycle = buildBoardCycle();
+  const cycleIndexByCell = new Map(cycle.map((cellIndex, index) => [cellIndex, index]));
+
+  const targets = cells
     .filter((cell) => cell.actualLevel > 0)
     .sort((a, b) => b.commits - a.commits || b.actualLevel - a.actualLevel || a.date.localeCompare(b.date) || a.index - b.index)
     .slice(0, TARGET_LIMIT);
 
-  const targets = activeTargets.length
-    ? activeTargets
-    : [...cells].sort((a, b) => b.displayLevel - a.displayLevel || a.date.localeCompare(b.date) || a.index - b.index);
+  const orderedTargets = targets.length
+    ? targets
+    : [...cells].sort((a, b) => b.displayLevel - a.displayLevel || a.date.localeCompare(b.date) || a.index - b.index).slice(0, TARGET_LIMIT);
 
-  const routeIndices = [0];
-  const stepCells = [0];
-  let currentIndex = 0;
+  const routeIndices = [];
+  const stepCells = [];
+  let currentCycleIndex = cycleIndexByCell.get(orderedTargets[0]?.index ?? 0) ?? 0;
 
-  targets.forEach((cell) => {
-    const segment = buildIndexPath(currentIndex, cell.index);
-    routeIndices.push(...segment);
-    stepCells.push(...segment);
-    currentIndex = cell.index;
+  orderedTargets.forEach((target, targetOrder) => {
+    const targetCycleIndex = cycleIndexByCell.get(target.index) ?? 0;
+    if (targetOrder === 0) {
+      routeIndices.push(cycle[currentCycleIndex]);
+      stepCells.push(cycle[currentCycleIndex]);
+    }
+
+    while (currentCycleIndex !== targetCycleIndex) {
+      currentCycleIndex = (currentCycleIndex + 1) % cycle.length;
+      routeIndices.push(cycle[currentCycleIndex]);
+      stepCells.push(cycle[currentCycleIndex]);
+    }
   });
+
+  const tailStart = currentCycleIndex;
+  for (let i = 0; i < Math.min(cycle.length, 20); i += 1) {
+    const tailIndex = (tailStart + i + 1) % cycle.length;
+    routeIndices.push(cycle[tailIndex]);
+    stepCells.push(cycle[tailIndex]);
+  }
 
   return {
     points: routeIndices.map((index) => cellCenter(index)),
     stepCells,
-    foodIndices: new Set(targets.map((cell) => cell.index)),
-    targets,
+    foodIndices: new Set(orderedTargets.map((cell) => cell.index)),
+    targets: orderedTargets,
   };
-}
-
-function buildIndexPath(fromIndex, toIndex) {
-  if (fromIndex === toIndex) {
-    return [toIndex];
-  }
-
-  const path = [];
-  let currentRow = Math.floor(fromIndex / BOARD_COLS);
-  let currentCol = fromIndex % BOARD_COLS;
-  const targetRow = Math.floor(toIndex / BOARD_COLS);
-  const targetCol = toIndex % BOARD_COLS;
-
-  while (currentCol !== targetCol) {
-    currentCol += currentCol < targetCol ? 1 : -1;
-    path.push(currentRow * BOARD_COLS + currentCol);
-  }
-
-  while (currentRow !== targetRow) {
-    currentRow += currentRow < targetRow ? 1 : -1;
-    path.push(currentRow * BOARD_COLS + currentCol);
-  }
-
-  return path;
 }
 
 function pointAt(points, progress) {
@@ -265,14 +273,14 @@ function renderSvg({ profile, repos, cells, frameIndex, route }) {
   const progress = eased * (route.points.length - 1);
   const routeStep = Math.max(0, Math.floor(progress));
   const eatenIndices = new Set(route.stepCells.slice(0, routeStep + 1).filter((index) => route.foodIndices.has(index)));
-  const bodySegments = Math.max(16, 12 + eatenIndices.size * 0.9);
+  const bodySegments = Math.max(18, 12 + eatenIndices.size * 1.25);
 
   const body = [];
   for (let i = 0; i < bodySegments; i += 1) {
-    const segmentProgress = Math.max(0, progress - i * 0.9);
+    const segmentProgress = Math.max(0, progress - i * 1.25);
     const p = pointAt(route.points, segmentProgress);
     const alpha = Math.max(0.18, 0.9 - i * 0.05);
-    const radius = Math.max(5, 12 - i * 0.42);
+    const radius = Math.max(4, 12 - i * 0.48);
     body.push(
       `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${radius.toFixed(2)}" fill="rgba(157,245,136,${alpha.toFixed(2)})"/>`,
     );
@@ -360,14 +368,14 @@ function formatNumber(value) {
 }
 
 async function main() {
-  const { profile, repos, contributionDays, repoCommitDays } = await loadGitHubData().catch(() => ({
+  const { profile, repos, contributionDays, repoCommits } = await loadGitHubData().catch(() => ({
     profile: fallbackProfile,
     repos: fallbackRepos,
     contributionDays: new Map(),
-    repoCommitDays: new Map(),
+    repoCommits: [],
   }));
 
-  const cells = buildActivityCells(contributionDays, repoCommitDays, repos);
+  const cells = buildActivityCells(contributionDays, repoCommits, repos);
   const route = buildSnakeRoute(cells);
 
   const browser = await puppeteer.launch({
