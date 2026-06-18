@@ -7,7 +7,10 @@
     "generate": "node generate-svg.js"
   },
   "dependencies": {
+    "@fortawesome/free-solid-svg-icons": "^7.2.0",
+    "@phosphor-icons/core": "^2.1.1",
     "html-to-image": "^1.11.13",
-    "puppeteer": "^24.10.2"
+    "puppeteer": "^24.10.2",
+    "simple-icons": "^16.23.0"
   }
 }
