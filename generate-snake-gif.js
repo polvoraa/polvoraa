@@ -154,34 +154,45 @@ function buildDateKeys(daysCount) {
   return keys;
 }
 
-function buildActivityLevels(contributionDays, repoCommitDays, repos) {
+function buildActivityCells(contributionDays, repoCommitDays, repos) {
   const expected = BOARD_COLS * BOARD_ROWS;
-  const fallback = buildDateKeys(expected).map((_, index) => {
-    const repoSignal = repos[index % Math.max(repos.length, 1)]?.stargazers_count || 0;
-    return (index * 7 + repoSignal) % 5;
-  });
+  const dates = buildDateKeys(expected);
 
-  const levels = buildDateKeys(expected).map((date, index) => {
+  return dates.map((date, index) => {
+    const repoSignal = repos[index % Math.max(repos.length, 1)]?.stargazers_count || 0;
     const contributionLevel = contributionDays.get(date) || 0;
     const repoCommits = repoCommitDays.get(date) || 0;
     const repoLevel = Math.min(4, Math.ceil(repoCommits / 2));
-    return Math.max(contributionLevel, repoLevel, fallback[index]);
-  });
+    const actualLevel = Math.max(contributionLevel, repoLevel);
+    const fallbackLevel = (index * 7 + repoSignal) % 5;
 
-  return levels;
+    return {
+      date,
+      index,
+      actualLevel,
+      displayLevel: actualLevel > 0 ? actualLevel : fallbackLevel,
+    };
+  });
 }
 
-function buildPathPoints() {
+function buildSnakeRoute(cells) {
+  const activeTargets = cells
+    .filter((cell) => cell.actualLevel > 0)
+    .sort((a, b) => b.actualLevel - a.actualLevel || a.date.localeCompare(b.date) || a.index - b.index);
+
+  const targets = activeTargets.length
+    ? activeTargets
+    : [...cells].sort((a, b) => b.displayLevel - a.displayLevel || a.date.localeCompare(b.date) || a.index - b.index);
+
   const points = [];
-  for (let row = 0; row < BOARD_ROWS; row += 1) {
-    for (let col = 0; col < BOARD_COLS; col += 1) {
-      const xCell = row % 2 === 0 ? col : BOARD_COLS - 1 - col;
-      const x = BOARD_X + xCell * (CELL + GAP) + CELL / 2;
-      const y = BOARD_Y + row * (CELL + GAP) + CELL / 2;
-      points.push({ x, y });
-    }
-  }
-  return points;
+  const start = cellCenter(0);
+  points.push(start);
+
+  targets.forEach((cell) => {
+    points.push(cellCenter(cell.index));
+  });
+
+  return { points, targets };
 }
 
 function pointAt(points, progress) {
@@ -206,15 +217,24 @@ function cellRect(index) {
   };
 }
 
-function renderSvg({ profile, repos, levels, frameIndex, points }) {
-  const progress = (frameIndex / FRAME_COUNT) * (points.length - 1);
-  const headIndex = Math.floor(progress);
-  const bodySegments = 14;
+function cellCenter(index) {
+  const rect = cellRect(index);
+  return {
+    x: rect.x + CELL / 2,
+    y: rect.y + CELL / 2,
+  };
+}
+
+function renderSvg({ profile, repos, cells, frameIndex, route }) {
+  const progress = (frameIndex / FRAME_COUNT) * (route.points.length - 1);
+  const consumedTargets = Math.min(route.targets.length, Math.floor(progress));
+  const eatenIndices = new Set(route.targets.slice(0, consumedTargets).map((cell) => cell.index));
+  const bodySegments = Math.max(14, 10 + consumedTargets * 0.45);
 
   const body = [];
   for (let i = 0; i < bodySegments; i += 1) {
-    const segmentProgress = Math.max(0, progress - i * 0.9);
-    const p = pointAt(points, segmentProgress);
+    const segmentProgress = Math.max(0, progress - i * 0.55);
+    const p = pointAt(route.points, segmentProgress);
     const alpha = Math.max(0.18, 0.9 - i * 0.05);
     const radius = Math.max(5, 12 - i * 0.42);
     body.push(
@@ -222,26 +242,28 @@ function renderSvg({ profile, repos, levels, frameIndex, points }) {
     );
   }
 
-  const cells = levels
+  const boardCells = cells
     .map((level, index) => {
-      const rect = cellRect(index);
-      const visited = index <= headIndex;
-      const palette = paletteLevels[level];
-      const dotOpacity = visited ? 0.12 : 0.98;
-      const fillOpacity = visited ? 0.6 : 1;
-      const dotRadius = 4 + level * 0.55;
+      const rect = cellRect(level.index);
+      const eaten = eatenIndices.has(level.index);
+      const palette = paletteLevels[level.displayLevel];
+      const dotRadius = 4 + level.displayLevel * 0.55;
       const cx = rect.x + CELL / 2;
       const cy = rect.y + CELL / 2;
+      const baseOpacity = level.actualLevel > 0 ? 1 : 0.55;
+      const dotOpacity = eaten ? 0 : baseOpacity;
+      const fillOpacity = eaten ? 0.12 : 1;
+      const targetGlow = level.actualLevel > 0 && !eaten ? "0.28" : "0.10";
 
       return `
-        <rect x="${rect.x}" y="${rect.y}" width="${CELL}" height="${CELL}" rx="7" fill="${palette.fill}" stroke="${palette.border}" />
-        <circle cx="${cx}" cy="${cy}" r="${dotRadius}" fill="${palette.dot}" opacity="${dotOpacity}" style="filter: drop-shadow(0 0 6px rgba(120,255,140,0.18));" />
+        <rect x="${rect.x}" y="${rect.y}" width="${CELL}" height="${CELL}" rx="7" fill="${eaten ? "rgba(17,18,22,0.92)" : palette.fill}" stroke="${eaten ? "rgba(255,255,255,0.02)" : palette.border}" />
+        <circle cx="${cx}" cy="${cy}" r="${dotRadius}" fill="${palette.dot}" opacity="${dotOpacity}" style="filter: drop-shadow(0 0 6px rgba(120,255,140,${targetGlow}));" />
         <rect x="${rect.x + 1}" y="${rect.y + 1}" width="${CELL - 2}" height="${CELL - 2}" rx="6" fill="none" stroke="rgba(255,255,255,${(0.03 * fillOpacity).toFixed(2)})" />
       `;
     })
     .join("");
 
-  const head = pointAt(points, progress);
+  const head = pointAt(route.points, progress);
   const glow = `
     <circle cx="${head.x.toFixed(2)}" cy="${head.y.toFixed(2)}" r="22" fill="rgba(111,255,145,0.10)" />
     <circle cx="${head.x.toFixed(2)}" cy="${head.y.toFixed(2)}" r="14" fill="#f7f7f8" />
@@ -289,7 +311,7 @@ function renderSvg({ profile, repos, levels, frameIndex, points }) {
       </text>
       <rect x="${BOARD_X - 22}" y="${BOARD_Y - 22}" width="${BOARD_WIDTH + 44}" height="${BOARD_HEIGHT + 44}" rx="28" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.08)" />
       <rect x="${BOARD_X - 12}" y="${BOARD_Y - 12}" width="${BOARD_WIDTH + 24}" height="${BOARD_HEIGHT + 24}" rx="24" fill="rgba(0,0,0,0.14)" />
-      ${cells}
+      ${boardCells}
       <circle cx="${head.x.toFixed(2)}" cy="${head.y.toFixed(2)}" r="30" fill="url(#glow)" opacity="0.42"/>
       ${body.join("")}
       ${glow}
@@ -309,8 +331,8 @@ async function main() {
     repoCommitDays: new Map(),
   }));
 
-  const levels = buildActivityLevels(contributionDays, repoCommitDays, repos);
-  const points = buildPathPoints();
+  const cells = buildActivityCells(contributionDays, repoCommitDays, repos);
+  const route = buildSnakeRoute(cells);
 
   const browser = await puppeteer.launch({
     headless: "new",
@@ -327,7 +349,7 @@ async function main() {
 
     const frames = [];
     for (let frameIndex = 0; frameIndex < FRAME_COUNT; frameIndex += 1) {
-      const svg = renderSvg({ profile, repos, levels, frameIndex, points });
+      const svg = renderSvg({ profile, repos, cells, frameIndex, route });
       await page.evaluate((markup) => {
         document.getElementById("root").innerHTML = markup;
       }, svg);
