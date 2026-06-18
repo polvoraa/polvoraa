@@ -66,46 +66,66 @@ async function fetchJson(url) {
   return response.json();
 }
 
+async function fetchText(url) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "text/html,application/xhtml+xml",
+      "User-Agent": "Mozilla/5.0",
+    },
+  });
+  if (!response.ok) throw new Error(`GitHub page error: ${response.status}`);
+  return response.text();
+}
+
 async function loadGitHubData() {
   if (!USERNAME || USERNAME === "SEU_USUARIO") {
-    return { profile: fallbackProfile, repos: fallbackRepos, events: [] };
+    return { profile: fallbackProfile, repos: fallbackRepos, levels: [] };
   }
 
-  const [profile, repos, events] = await Promise.all([
+  const [profile, repos, contributionsHtml] = await Promise.all([
     fetchJson(`https://api.github.com/users/${USERNAME}`),
     fetchJson(`https://api.github.com/users/${USERNAME}/repos?per_page=100&sort=updated`),
-    fetchJson(`https://api.github.com/users/${USERNAME}/events/public?per_page=100`),
+    fetchText(`https://github.com/users/${USERNAME}/contributions`),
   ]);
 
-  return { profile, repos, events };
+  return { profile, repos, levels: parseContributionLevels(contributionsHtml) };
 }
 
 function getTotalStars(repos) {
   return repos.reduce((sum, repo) => sum + (repo.stargazers_count || 0), 0);
 }
 
-function buildActivityLevels(events, repos) {
-  const activityByDay = new Map();
+function parseContributionLevels(html) {
+  const cells = [];
+  const regex = /data-date="(\d{4}-\d{2}-\d{2})"[^>]*data-level="(\d)"/g;
+  let match;
 
-  events.forEach((event) => {
-    if (event.type !== "PushEvent") return;
-    const key = new Date(event.created_at).toISOString().slice(0, 10);
-    activityByDay.set(key, (activityByDay.get(key) || 0) + (event.payload?.commits?.length || 0));
-  });
-
-  const levels = [];
-  for (let index = 0; index < BOARD_COLS * BOARD_ROWS; index += 1) {
-    const day = new Date();
-    day.setDate(day.getDate() - ((BOARD_COLS * BOARD_ROWS - 1) - index));
-    const key = day.toISOString().slice(0, 10);
-    const eventLevel = activityByDay.get(key) || 0;
-    const repoSignal = repos[index % Math.max(repos.length, 1)]?.stargazers_count || 0;
-    const fallbackLevel = ((index * 7 + repoSignal) % 5) / 4;
-    const rawLevel = events.length ? Math.min(eventLevel / 4, 1) : fallbackLevel;
-    levels.push(Math.max(0, Math.min(4, Math.round(rawLevel * 4))));
+  while ((match = regex.exec(html)) !== null) {
+    cells.push({ date: match[1], level: Number(match[2]) });
   }
 
-  return levels;
+  cells.sort((a, b) => a.date.localeCompare(b.date));
+
+  const normalized = cells.map((cell) => cell.level);
+  const expected = BOARD_COLS * BOARD_ROWS;
+  if (normalized.length >= expected) {
+    return normalized.slice(normalized.length - expected);
+  }
+
+  return [...Array(expected - normalized.length).fill(0), ...normalized];
+}
+
+function buildActivityLevels(levels, repos) {
+  if (levels.length) {
+    return levels.slice(0, BOARD_COLS * BOARD_ROWS);
+  }
+
+  const fallback = [];
+  for (let index = 0; index < BOARD_COLS * BOARD_ROWS; index += 1) {
+    const repoSignal = repos[index % Math.max(repos.length, 1)]?.stargazers_count || 0;
+    fallback.push((index * 7 + repoSignal) % 5);
+  }
+  return fallback;
 }
 
 function buildPathPoints() {
@@ -239,13 +259,13 @@ function formatNumber(value) {
 }
 
 async function main() {
-  const { profile, repos, events } = await loadGitHubData().catch(() => ({
+  const { profile, repos, levels: contributionLevels } = await loadGitHubData().catch(() => ({
     profile: fallbackProfile,
     repos: fallbackRepos,
-    events: [],
+    levels: [],
   }));
 
-  const levels = buildActivityLevels(events, repos);
+  const levels = buildActivityLevels(contributionLevels, repos);
   const points = buildPathPoints();
 
   const browser = await puppeteer.launch({
