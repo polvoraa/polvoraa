@@ -237,7 +237,7 @@ h1 {
   right: 54px;
   height: 284px;
   border-radius: 32px;
-  padding: 32px;
+  padding: 32px 32px 44px;
 }
 
 .section-heading {
@@ -257,61 +257,9 @@ h1 {
   text-align: right;
 }
 
-.commit-chart {
-  margin-top: 24px;
-  display: grid;
-  grid-template-columns: repeat(14, minmax(0, 1fr));
-  gap: 8px;
-  align-items: end;
-  padding: 16px 14px 12px;
-  border-radius: 24px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-  border: 1px solid var(--line-soft);
-}
-
-.commit-column {
-  min-width: 0;
-  display: grid;
-  gap: 8px;
-  justify-items: center;
-}
-
-.commit-bar-shell {
-  width: 100%;
-  height: 54px;
-  display: flex;
-  align-items: end;
-}
-
-.commit-bar {
-  display: block;
-  width: 100%;
-  min-height: 8px;
-  height: calc(8px + (46px * var(--value)));
-  border-radius: 999px 999px 10px 10px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.24)),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  opacity: 0.9;
-}
-
-.commit-bar[data-peak="true"] {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.34)),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06));
-}
-
-.commit-label {
-  color: var(--faint);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .heatmap {
-  margin-top: 18px;
+  margin-top: 30px;
+  padding-bottom: 6px;
   display: grid;
   grid-template-columns: repeat(26, 1fr);
   grid-auto-rows: 14px;
@@ -320,8 +268,12 @@ h1 {
 
 .heat-cell {
   border-radius: 5px;
-  background: rgba(255, 255, 255, calc(0.045 + var(--level) * 0.12));
-  border: 1px solid rgba(255, 255, 255, calc(0.02 + var(--level) * 0.045));
+  background:
+    linear-gradient(180deg,
+      rgba(255, 255, 255, calc(0.05 + var(--level) * 0.26)),
+      rgba(255, 255, 255, calc(0.03 + var(--level) * 0.14)));
+  border: 1px solid rgba(255, 255, 255, calc(0.02 + var(--level) * 0.085));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, calc(0.06 + var(--level) * 0.12));
 }
 
 .focus {
@@ -613,10 +565,6 @@ h1 {
     font-size: 22px;
   }
 
-  .commit-chart {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-  }
-
   .projects-grid {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
@@ -675,11 +623,6 @@ h1 {
     gap: 10px;
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .commit-chart {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 6px;
   }
 
   .heatmap {

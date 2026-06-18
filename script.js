@@ -123,56 +123,19 @@ function renderHeatmap(events, repos) {
     const cell = document.createElement("span");
     cell.className = "heat-cell";
     cell.style.setProperty("--level", level.toFixed(2));
+    const palette = [
+      ["rgba(255, 255, 255, 0.035)", "rgba(255, 255, 255, 0.05)"],
+      ["rgba(161, 218, 163, 0.22)", "rgba(161, 218, 163, 0.3)"],
+      ["rgba(76, 175, 93, 0.34)", "rgba(76, 175, 93, 0.46)"],
+      ["rgba(42, 153, 66, 0.48)", "rgba(42, 153, 66, 0.62)"],
+      ["rgba(35, 122, 53, 0.66)", "rgba(35, 122, 53, 0.8)"],
+    ];
+    const levelIndex = Math.min(4, Math.max(0, Math.round(level * 4)));
+    const [fill, border] = palette[levelIndex];
+    cell.style.background = `linear-gradient(180deg, ${fill}, ${border})`;
+    cell.style.borderColor = border;
     heatmap.appendChild(cell);
   }
-}
-
-function renderCommitChart(events, repos) {
-  const chart = $("commitChart");
-  chart.innerHTML = "";
-
-  const commitCounts = new Map();
-  events
-    .filter((event) => event.type === "PushEvent")
-    .forEach((event) => {
-      const key = new Date(event.created_at).toISOString().slice(0, 10);
-      const commits = event.payload?.commits?.length || 0;
-      commitCounts.set(key, (commitCounts.get(key) || 0) + commits);
-    });
-
-  const days = [];
-  for (let offset = 13; offset >= 0; offset -= 1) {
-    const day = new Date();
-    day.setDate(day.getDate() - offset);
-    const key = day.toISOString().slice(0, 10);
-    const value = commitCounts.get(key) || 0;
-    days.push({
-      key,
-      value,
-      label: day.toLocaleDateString("en", { weekday: "short" }).slice(0, 2),
-    });
-  }
-
-  const peak = Math.max(...days.map((day) => day.value), 0);
-  const hasActivity = peak > 0;
-  const fallbackScale = repos.length ? Math.max(1, Math.round(getTotalStars(repos) / 12)) : 1;
-
-  chart.innerHTML = days
-    .map(
-      (day, index) => `
-        <div class="commit-column" title="${day.key}">
-          <span class="commit-bar-shell">
-            <span
-              class="commit-bar"
-              style="--value:${hasActivity ? day.value / peak : Math.min(1, (fallbackScale * ((index % 4) + 1)) / 10)};"
-              data-peak="${day.value === peak ? "true" : "false"}"
-            ></span>
-          </span>
-          <span class="commit-label">${day.label}</span>
-        </div>
-      `,
-    )
-    .join("");
 }
 
 function renderProjects(repos) {
@@ -224,14 +187,12 @@ async function init() {
     const repoList = repos.length ? repos : fallbackRepos;
     renderProfile(profile);
     renderStats(repoList, events);
-    renderCommitChart(events, repoList);
     renderHeatmap(events, repoList);
     renderProjects(repoList);
   } catch (error) {
     console.warn(error);
     renderProfile(fallbackProfile);
     renderStats(fallbackRepos, []);
-    renderCommitChart([], fallbackRepos);
     renderHeatmap([], fallbackRepos);
     renderProjects(fallbackRepos);
   } finally {

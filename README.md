@@ -1,5 +1,3 @@
-# Matheus Saraiva
-
 <p align="center">
   <img src="./profile-dashboard.png" alt="GitHub dashboard" width="100%" />
 </p>
