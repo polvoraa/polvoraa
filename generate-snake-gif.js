@@ -8,9 +8,10 @@ const { GIFEncoder, quantize, applyPalette } = require("gifenc");
 const USERNAME = "polvoraa";
 const WIDTH = 1280;
 const HEIGHT = 540;
-const FRAME_COUNT = 144;
-const FRAME_MS = 45;
+const FRAME_COUNT = 260;
+const FRAME_MS = 72;
 const OUTPUT_PATH = path.join(__dirname, "profile-snake.gif");
+const TARGET_LIMIT = 12;
 
 const BOARD_COLS = 8;
 const BOARD_ROWS = 13;
@@ -162,15 +163,16 @@ function buildActivityCells(contributionDays, repoCommitDays, repos) {
     const repoSignal = repos[index % Math.max(repos.length, 1)]?.stargazers_count || 0;
     const contributionLevel = contributionDays.get(date) || 0;
     const repoCommits = repoCommitDays.get(date) || 0;
-    const repoLevel = Math.min(4, Math.ceil(repoCommits / 2));
-    const actualLevel = Math.max(contributionLevel, repoLevel);
+    const repoLevel = Math.min(4, Math.ceil(repoCommits / 4));
+    const actualLevel = repoLevel;
     const fallbackLevel = (index * 7 + repoSignal) % 5;
 
     return {
       date,
       index,
       actualLevel,
-      displayLevel: actualLevel > 0 ? actualLevel : fallbackLevel,
+      displayLevel: actualLevel > 0 ? Math.max(actualLevel, contributionLevel) : fallbackLevel,
+      commits: repoCommits,
     };
   });
 }
@@ -178,7 +180,8 @@ function buildActivityCells(contributionDays, repoCommitDays, repos) {
 function buildSnakeRoute(cells) {
   const activeTargets = cells
     .filter((cell) => cell.actualLevel > 0)
-    .sort((a, b) => b.actualLevel - a.actualLevel || a.date.localeCompare(b.date) || a.index - b.index);
+    .sort((a, b) => b.commits - a.commits || b.actualLevel - a.actualLevel || a.date.localeCompare(b.date) || a.index - b.index)
+    .slice(0, TARGET_LIMIT);
 
   const targets = activeTargets.length
     ? activeTargets
@@ -258,14 +261,15 @@ function cellCenter(index) {
 }
 
 function renderSvg({ profile, repos, cells, frameIndex, route }) {
-  const progress = (frameIndex / FRAME_COUNT) * (route.points.length - 1);
+  const eased = Math.pow(frameIndex / Math.max(FRAME_COUNT - 1, 1), 1.2);
+  const progress = eased * (route.points.length - 1);
   const routeStep = Math.max(0, Math.floor(progress));
   const eatenIndices = new Set(route.stepCells.slice(0, routeStep + 1).filter((index) => route.foodIndices.has(index)));
-  const bodySegments = Math.max(14, 10 + eatenIndices.size * 0.45);
+  const bodySegments = Math.max(16, 12 + eatenIndices.size * 0.9);
 
   const body = [];
   for (let i = 0; i < bodySegments; i += 1) {
-    const segmentProgress = Math.max(0, progress - i * 0.75);
+    const segmentProgress = Math.max(0, progress - i * 0.9);
     const p = pointAt(route.points, segmentProgress);
     const alpha = Math.max(0.18, 0.9 - i * 0.05);
     const radius = Math.max(5, 12 - i * 0.42);
