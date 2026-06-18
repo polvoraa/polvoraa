@@ -33,7 +33,11 @@ async function main() {
       });
     });
 
-    await fs.writeFile(outputPath, svg, "utf8");
+    const normalizedSvg = String(svg).trimStart();
+    const match = normalizedSvg.match(/^data:image\/svg\+xml(?:;charset=utf-8)?,(.*)$/s);
+    const serializedSvg = match ? decodeURIComponent(match[1]) : normalizedSvg;
+
+    await fs.writeFile(outputPath, serializedSvg, "utf8");
     console.log(`Generated ${outputPath}`);
   } finally {
     await browser.close();
