@@ -25,11 +25,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate SVG
+      - name: Generate dashboard image
         run: npm run generate
 
       - name: Commit updated dashboard
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: update profile dashboard"
-          file_pattern: profile-dashboard.svg
+          file_pattern: profile-dashboard.png

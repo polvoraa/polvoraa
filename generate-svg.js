@@ -3,7 +3,7 @@ const path = require("node:path");
 const puppeteer = require("puppeteer");
 
 const root = __dirname;
-const outputPath = path.join(root, "profile-dashboard.svg");
+const outputPath = path.join(root, "profile-dashboard.png");
 
 async function main() {
   const browser = await puppeteer.launch({
@@ -16,28 +16,16 @@ async function main() {
     await page.setViewport({ width: 1600, height: 900, deviceScaleFactor: 1 });
     await page.goto(`file://${path.join(root, "index.html")}`, { waitUntil: "networkidle0" });
     await page.waitForFunction("window.dashboardReady === true", { timeout: 30000 });
-    await page.addScriptTag({ path: require.resolve("html-to-image/dist/html-to-image.js") });
 
-    const svg = await page.evaluate(async () => {
-      const node = document.getElementById("dashboard");
-      return window.htmlToImage.toSvg(node, {
-        width: 1600,
-        height: 900,
-        cacheBust: true,
-        pixelRatio: 1,
-        backgroundColor: "#0A0A0A",
-        style: {
-          transform: "none",
-          transformOrigin: "top left",
-        },
-      });
+    const node = await page.$("#dashboard");
+    if (!node) throw new Error("Dashboard node not found");
+
+    await node.screenshot({
+      path: outputPath,
+      type: "png",
+      omitBackground: false,
     });
 
-    const normalizedSvg = String(svg).trimStart();
-    const match = normalizedSvg.match(/^data:image\/svg\+xml(?:;charset=utf-8)?,(.*)$/s);
-    const serializedSvg = match ? decodeURIComponent(match[1]) : normalizedSvg;
-
-    await fs.writeFile(outputPath, serializedSvg, "utf8");
     console.log(`Generated ${outputPath}`);
   } finally {
     await browser.close();
