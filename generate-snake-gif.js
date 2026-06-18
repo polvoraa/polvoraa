@@ -8,7 +8,7 @@ const { GIFEncoder, quantize, applyPalette } = require("gifenc");
 const USERNAME = "polvoraa";
 const WIDTH = 1280;
 const HEIGHT = 540;
-const FRAME_COUNT = 96;
+const FRAME_COUNT = 144;
 const FRAME_MS = 45;
 const OUTPUT_PATH = path.join(__dirname, "profile-snake.gif");
 
@@ -184,15 +184,47 @@ function buildSnakeRoute(cells) {
     ? activeTargets
     : [...cells].sort((a, b) => b.displayLevel - a.displayLevel || a.date.localeCompare(b.date) || a.index - b.index);
 
-  const points = [];
-  const start = cellCenter(0);
-  points.push(start);
+  const routeIndices = [0];
+  const stepCells = [0];
+  let currentIndex = 0;
 
   targets.forEach((cell) => {
-    points.push(cellCenter(cell.index));
+    const segment = buildIndexPath(currentIndex, cell.index);
+    routeIndices.push(...segment);
+    stepCells.push(...segment);
+    currentIndex = cell.index;
   });
 
-  return { points, targets };
+  return {
+    points: routeIndices.map((index) => cellCenter(index)),
+    stepCells,
+    foodIndices: new Set(targets.map((cell) => cell.index)),
+    targets,
+  };
+}
+
+function buildIndexPath(fromIndex, toIndex) {
+  if (fromIndex === toIndex) {
+    return [toIndex];
+  }
+
+  const path = [];
+  let currentRow = Math.floor(fromIndex / BOARD_COLS);
+  let currentCol = fromIndex % BOARD_COLS;
+  const targetRow = Math.floor(toIndex / BOARD_COLS);
+  const targetCol = toIndex % BOARD_COLS;
+
+  while (currentCol !== targetCol) {
+    currentCol += currentCol < targetCol ? 1 : -1;
+    path.push(currentRow * BOARD_COLS + currentCol);
+  }
+
+  while (currentRow !== targetRow) {
+    currentRow += currentRow < targetRow ? 1 : -1;
+    path.push(currentRow * BOARD_COLS + currentCol);
+  }
+
+  return path;
 }
 
 function pointAt(points, progress) {
@@ -227,13 +259,13 @@ function cellCenter(index) {
 
 function renderSvg({ profile, repos, cells, frameIndex, route }) {
   const progress = (frameIndex / FRAME_COUNT) * (route.points.length - 1);
-  const consumedTargets = Math.min(route.targets.length, Math.floor(progress));
-  const eatenIndices = new Set(route.targets.slice(0, consumedTargets).map((cell) => cell.index));
-  const bodySegments = Math.max(14, 10 + consumedTargets * 0.45);
+  const routeStep = Math.max(0, Math.floor(progress));
+  const eatenIndices = new Set(route.stepCells.slice(0, routeStep + 1).filter((index) => route.foodIndices.has(index)));
+  const bodySegments = Math.max(14, 10 + eatenIndices.size * 0.45);
 
   const body = [];
   for (let i = 0; i < bodySegments; i += 1) {
-    const segmentProgress = Math.max(0, progress - i * 0.55);
+    const segmentProgress = Math.max(0, progress - i * 0.75);
     const p = pointAt(route.points, segmentProgress);
     const alpha = Math.max(0.18, 0.9 - i * 0.05);
     const radius = Math.max(5, 12 - i * 0.42);
