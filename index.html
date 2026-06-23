@@ -66,7 +66,56 @@
           <p class="eyebrow">Contribution Overview</p>
           <h2>Activity, quietly composed.</h2>
         </div>
-        <div id="heatmap" class="heatmap" aria-label="GitHub contribution heatmap"></div>
+        <div class="overview-layout">
+          <div id="heatmap" class="heatmap" aria-label="GitHub contribution heatmap"></div>
+          <div class="mask-card" aria-label="Iron Man inspired mask illustration">
+            <svg viewBox="0 0 360 360" role="img" aria-hidden="true">
+              <defs>
+                <linearGradient id="mask-metal" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#e3e4e8" />
+                  <stop offset="40%" stop-color="#9da1a8" />
+                  <stop offset="100%" stop-color="#565a62" />
+                </linearGradient>
+                <linearGradient id="mask-shadow" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#1a1b1f" />
+                  <stop offset="100%" stop-color="#060607" />
+                </linearGradient>
+                <radialGradient id="eye-lilac" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#efe7ff" />
+                  <stop offset="55%" stop-color="#c7adff" />
+                  <stop offset="100%" stop-color="#7d5cff" />
+                </radialGradient>
+              </defs>
+              <circle cx="180" cy="180" r="148" fill="rgba(255,255,255,0.03)" />
+              <path d="M124 56h112c31 0 58 22 66 52l18 68c5 20 2 42-9 59l-31 48c-12 18-32 29-54 29h-92c-22 0-42-11-54-29l-31-48c-11-17-14-39-9-59l18-68c8-30 35-52 66-52Z" fill="url(#mask-metal)" />
+              <path d="M132 75h96c26 0 48 18 54 43l16 61c4 15 2 32-6 45l-27 42c-10 15-27 24-45 24h-80c-18 0-35-9-45-24l-27-42c-8-13-10-30-6-45l16-61c6-25 28-43 54-43Z" fill="url(#mask-shadow)" opacity="0.72" />
+              <path d="M116 124c10-26 28-40 52-40h24c24 0 42 14 52 40l12 30c5 13 4 28-3 40l-24 40c-7 12-20 19-34 19h-52c-14 0-27-7-34-19l-24-40c-7-12-8-27-3-40l12-30Z" fill="#a3a6ad" opacity="0.95" />
+              <path d="M147 140h66c12 0 22 9 24 21l8 41c1 7-1 14-5 20l-9 13c-5 8-14 13-24 13h-54c-10 0-19-5-24-13l-9-13c-4-6-6-13-5-20l8-41c2-12 12-21 24-21Z" fill="#6f7279" opacity="0.9" />
+              <path d="M128 164c7-12 19-19 33-19h38c14 0 26 7 33 19l11 19c4 7 4 16 0 23l-16 28c-5 10-15 16-27 16h-40c-12 0-22-6-27-16l-16-28c-4-7-4-16 0-23l11-19Z" fill="url(#mask-shadow)" opacity="0.96" />
+              <path d="M136 164c6-8 14-13 24-13h40c10 0 18 5 24 13l10 14c3 4 3 10 0 14l-12 21c-4 7-12 11-20 11h-44c-8 0-16-4-20-11l-12-21c-3-4-3-10 0-14l10-14Z" fill="#0d0d10" />
+              <path d="M129 111c13-12 31-18 51-18h0c20 0 38 6 51 18" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="5" stroke-linecap="round" />
+              <path d="M107 106c-12 10-18 24-18 39v17" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="5" stroke-linecap="round" />
+              <path d="M253 106c12 10 18 24 18 39v17" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="5" stroke-linecap="round" />
+              <path d="M154 186h52" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="4" stroke-linecap="round" />
+              <path d="M180 78v24" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="4" stroke-linecap="round" />
+              <path d="M146 225l-16 22" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="4" stroke-linecap="round" />
+              <path d="M214 225l16 22" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="4" stroke-linecap="round" />
+              <path d="M147 161c6-10 14-15 24-15h18c10 0 18 5 24 15" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3" stroke-linecap="round" />
+              <path d="M132 171h22l18 18" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3" stroke-linecap="round" />
+              <path d="M228 171h-22l-18 18" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3" stroke-linecap="round" />
+              <path d="M145 150c9-5 19-7 35-7s26 2 35 7" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="3" stroke-linecap="round" />
+              <path d="M150 171c7-8 18-12 30-12s23 4 30 12" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2.5" stroke-linecap="round" />
+              <g class="mask-eyes">
+                <path d="M150 154c9-7 20-10 30-10s21 3 30 10c-6 4-13 6-20 6h-20c-7 0-14-2-20-6Z" fill="url(#eye-lilac)" />
+                <path d="M150 154c9-7 20-10 30-10s21 3 30 10c-6 4-13 6-20 6h-20c-7 0-14-2-20-6Z" fill="rgba(185,147,255,0.14)" />
+                <path d="M130 153c12-16 28-24 50-24s38 8 50 24c-10 6-20 9-30 9h-40c-10 0-20-3-30-9Z" fill="rgba(168,127,255,0.12)" />
+                <path d="M151 155c8-4 16-6 29-6s21 2 29 6c-5 4-11 6-17 6h-24c-6 0-12-2-17-6Z" fill="#f2e9ff" opacity="0.94" />
+                <circle cx="165" cy="154" r="4.2" fill="#a67dff" />
+                <circle cx="195" cy="154" r="4.2" fill="#a67dff" />
+              </g>
+            </svg>
+          </div>
+        </div>
       </section>
 
       <section class="focus glass-panel">

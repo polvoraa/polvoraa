@@ -266,6 +266,68 @@ h1 {
   gap: 8px;
 }
 
+.overview-layout {
+  margin-top: 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 22px;
+  align-items: stretch;
+}
+
+.mask-card {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at 50% 28%, rgba(255, 255, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.mask-card::before {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 22px;
+  background: radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.05), transparent 58%);
+  pointer-events: none;
+}
+
+.mask-card svg {
+  position: relative;
+  width: min(220px, 100%);
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.32));
+}
+
+.mask-eyes {
+  transform-origin: 180px 154px;
+  animation: mask-breathe 5.8s ease-in-out infinite;
+}
+
+.mask-eyes path,
+.mask-eyes circle {
+  filter: drop-shadow(0 0 8px rgba(190, 154, 255, 0.24));
+}
+
+@keyframes mask-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
 .heat-cell {
   border-radius: 5px;
   background:
@@ -565,6 +627,10 @@ h1 {
     font-size: 22px;
   }
 
+  .overview-layout {
+    grid-template-columns: 1fr;
+  }
+
   .projects-grid {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
@@ -627,6 +693,10 @@ h1 {
 
   .heatmap {
     grid-template-columns: repeat(13, minmax(0, 1fr));
+  }
+
+  .mask-card {
+    min-height: 240px;
   }
 
   .tech-grid {
