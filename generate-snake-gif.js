@@ -219,6 +219,17 @@ function buildOrthogonalPath(startIndex, targetIndex) {
   return path;
 }
 
+function buildSweepOrder() {
+  const indices = [];
+  for (let row = 0; row < BOARD_ROWS; row += 1) {
+    const cols = row % 2 === 0 ? [...Array(BOARD_COLS).keys()] : [...Array(BOARD_COLS).keys()].reverse();
+    cols.forEach((col) => {
+      indices.push(coordsToIndex(row, col));
+    });
+  }
+  return indices;
+}
+
 function buildSnakeRoute(cells) {
   const targets = cells
     .filter((cell) => cell.actualLevel > 0)
@@ -230,11 +241,28 @@ function buildSnakeRoute(cells) {
 
   const routeIndices = [coordsToIndex(0, 0)];
   let currentIndex = routeIndices[0];
+  const visited = new Set(routeIndices);
 
   orderedTargets.forEach((target) => {
     const segment = buildOrthogonalPath(currentIndex, target.index);
-    routeIndices.push(...segment.slice(1));
+    segment.slice(1).forEach((index) => {
+      routeIndices.push(index);
+      visited.add(index);
+    });
     currentIndex = target.index;
+  });
+
+  const sweepOrder = buildSweepOrder();
+  sweepOrder.forEach((index) => {
+    if (visited.has(index)) {
+      return;
+    }
+    const segment = buildOrthogonalPath(currentIndex, index);
+    segment.slice(1).forEach((step) => {
+      routeIndices.push(step);
+      visited.add(step);
+    });
+    currentIndex = index;
   });
 
   return {
