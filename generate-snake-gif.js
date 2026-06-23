@@ -8,10 +8,7 @@ const { GIFEncoder, quantize, applyPalette } = require("gifenc");
 const USERNAME = "polvoraa";
 const WIDTH = 1280;
 const HEIGHT = 540;
-const FRAME_COUNT = 180;
-const FRAME_MS = 80;
 const OUTPUT_PATH = path.join(__dirname, "profile-snake.gif");
-const TARGET_LIMIT = 8;
 
 const BOARD_COLS = 8;
 const BOARD_ROWS = 13;
@@ -19,6 +16,7 @@ const CELL = 26;
 const GAP = 7;
 const BOARD_WIDTH = BOARD_COLS * CELL + (BOARD_COLS - 1) * GAP;
 const BOARD_HEIGHT = BOARD_ROWS * CELL + (BOARD_ROWS - 1) * GAP;
+const FRAME_MS = 90;
 const PANEL_X = 24;
 const PANEL_Y = 24;
 const PANEL_WIDTH = WIDTH - PANEL_X * 2;
@@ -181,73 +179,68 @@ function buildActivityCells(contributionDays, repoCommits, repos) {
   });
 }
 
-function buildBoardCycle() {
-  const indices = [];
-  for (let row = 0; row < BOARD_ROWS; row += 1) {
-    const cols = row % 2 === 0 ? [...Array(BOARD_COLS).keys()] : [...Array(BOARD_COLS).keys()].reverse();
-    cols.forEach((col) => {
-      indices.push(row * BOARD_COLS + col);
-    });
+function cellCoords(index) {
+  const row = Math.floor(index / BOARD_COLS);
+  const col = row % 2 === 0 ? index % BOARD_COLS : BOARD_COLS - 1 - (index % BOARD_COLS);
+  return { row, col };
+}
+
+function coordsToIndex(row, col) {
+  return row * BOARD_COLS + (row % 2 === 0 ? col : BOARD_COLS - 1 - col);
+}
+
+function buildOrthogonalPath(startIndex, targetIndex) {
+  const path = [startIndex];
+  let { row, col } = cellCoords(startIndex);
+  const target = cellCoords(targetIndex);
+
+  const stepRow = () => {
+    while (row !== target.row) {
+      row += row < target.row ? 1 : -1;
+      path.push(coordsToIndex(row, col));
+    }
+  };
+
+  const stepCol = () => {
+    while (col !== target.col) {
+      col += col < target.col ? 1 : -1;
+      path.push(coordsToIndex(row, col));
+    }
+  };
+
+  if (Math.abs(target.col - col) >= Math.abs(target.row - row)) {
+    stepCol();
+    stepRow();
+  } else {
+    stepRow();
+    stepCol();
   }
-  return indices;
+
+  return path;
 }
 
 function buildSnakeRoute(cells) {
-  const cycle = buildBoardCycle();
-  const cycleIndexByCell = new Map(cycle.map((cellIndex, index) => [cellIndex, index]));
-
   const targets = cells
     .filter((cell) => cell.actualLevel > 0)
-    .sort((a, b) => b.commits - a.commits || b.actualLevel - a.actualLevel || a.date.localeCompare(b.date) || a.index - b.index)
-    .slice(0, TARGET_LIMIT);
+    .sort((a, b) => b.commits - a.commits || b.actualLevel - a.actualLevel || a.date.localeCompare(b.date) || a.index - b.index);
 
   const orderedTargets = targets.length
     ? targets
-    : [...cells].sort((a, b) => b.displayLevel - a.displayLevel || a.date.localeCompare(b.date) || a.index - b.index).slice(0, TARGET_LIMIT);
+    : [...cells].sort((a, b) => b.displayLevel - a.displayLevel || a.date.localeCompare(b.date) || a.index - b.index);
 
-  const routeIndices = [];
-  const stepCells = [];
-  let currentCycleIndex = cycleIndexByCell.get(orderedTargets[0]?.index ?? 0) ?? 0;
+  const routeIndices = [coordsToIndex(0, 0)];
+  let currentIndex = routeIndices[0];
 
-  orderedTargets.forEach((target, targetOrder) => {
-    const targetCycleIndex = cycleIndexByCell.get(target.index) ?? 0;
-    if (targetOrder === 0) {
-      routeIndices.push(cycle[currentCycleIndex]);
-      stepCells.push(cycle[currentCycleIndex]);
-    }
-
-    while (currentCycleIndex !== targetCycleIndex) {
-      currentCycleIndex = (currentCycleIndex + 1) % cycle.length;
-      routeIndices.push(cycle[currentCycleIndex]);
-      stepCells.push(cycle[currentCycleIndex]);
-    }
+  orderedTargets.forEach((target) => {
+    const segment = buildOrthogonalPath(currentIndex, target.index);
+    routeIndices.push(...segment.slice(1));
+    currentIndex = target.index;
   });
 
-  const tailStart = currentCycleIndex;
-  for (let i = 0; i < Math.min(cycle.length, 20); i += 1) {
-    const tailIndex = (tailStart + i + 1) % cycle.length;
-    routeIndices.push(cycle[tailIndex]);
-    stepCells.push(cycle[tailIndex]);
-  }
-
   return {
-    points: routeIndices.map((index) => cellCenter(index)),
-    stepCells,
-    foodIndices: new Set(orderedTargets.map((cell) => cell.index)),
+    stepCells: routeIndices,
+    foodIndices: new Set(targets.map((cell) => cell.index)),
     targets: orderedTargets,
-  };
-}
-
-function pointAt(points, progress) {
-  const clamped = Math.max(0, Math.min(points.length - 1, progress));
-  const index = Math.floor(clamped);
-  const nextIndex = Math.min(points.length - 1, index + 1);
-  const t = clamped - index;
-  const a = points[index];
-  const b = points[nextIndex];
-  return {
-    x: a.x + (b.x - a.x) * t,
-    y: a.y + (b.y - a.y) * t,
   };
 }
 
@@ -260,58 +253,54 @@ function cellRect(index) {
   };
 }
 
-function cellCenter(index) {
-  const rect = cellRect(index);
-  return {
-    x: rect.x + CELL / 2,
-    y: rect.y + CELL / 2,
-  };
-}
-
 function renderSvg({ profile, repos, cells, frameIndex, route }) {
-  const eased = Math.pow(frameIndex / Math.max(FRAME_COUNT - 1, 1), 1.2);
-  const progress = eased * (route.points.length - 1);
-  const routeStep = Math.max(0, Math.floor(progress));
-  const eatenIndices = new Set(route.stepCells.slice(0, routeStep + 1).filter((index) => route.foodIndices.has(index)));
-  const bodySegments = Math.max(18, 12 + eatenIndices.size * 1.25);
-
-  const body = [];
-  for (let i = 0; i < bodySegments; i += 1) {
-    const segmentProgress = Math.max(0, progress - i * 1.25);
-    const p = pointAt(route.points, segmentProgress);
-    const alpha = Math.max(0.18, 0.9 - i * 0.05);
-    const radius = Math.max(4, 12 - i * 0.48);
-    body.push(
-      `<circle cx="${p.x.toFixed(2)}" cy="${p.y.toFixed(2)}" r="${radius.toFixed(2)}" fill="rgba(157,245,136,${alpha.toFixed(2)})"/>`,
-    );
-  }
+  const routeLength = route.stepCells.length;
+  const routeStep = Math.min(frameIndex, routeLength - 1);
+  const visitedIndices = new Set(route.stepCells.slice(0, routeStep + 1));
+  const snakeLength = Math.min(routeStep + 1, Math.max(10, Math.min(24, 10 + Math.floor(routeStep / 7))));
+  const snakeTrail = route.stepCells.slice(Math.max(0, routeStep - snakeLength + 1), routeStep + 1);
+  const snakeTrailIndex = new Map(snakeTrail.map((index, age) => [index, age]));
+  const headIndex = snakeTrail[snakeTrail.length - 1] ?? route.stepCells[0];
+  const headRect = cellRect(headIndex);
+  const headCx = headRect.x + CELL / 2;
+  const headCy = headRect.y + CELL / 2;
 
   const boardCells = cells
     .map((level, index) => {
       const rect = cellRect(level.index);
-      const eaten = eatenIndices.has(level.index);
+      const visited = visitedIndices.has(level.index);
+      const trailAge = snakeTrailIndex.get(level.index);
+      const onSnake = typeof trailAge === "number";
+      const trailPosition = onSnake && snakeTrail.length > 1 ? trailAge / (snakeTrail.length - 1) : 1;
       const palette = paletteLevels[level.displayLevel];
-      const dotRadius = 4 + level.displayLevel * 0.55;
+      const dotRadius = 4 + level.displayLevel * 0.55 + (route.foodIndices.has(level.index) && !visited ? 1.2 : 0);
       const cx = rect.x + CELL / 2;
       const cy = rect.y + CELL / 2;
       const baseOpacity = level.actualLevel > 0 ? 1 : 0.55;
-      const dotOpacity = eaten ? 0 : baseOpacity;
-      const fillOpacity = eaten ? 0.12 : 1;
-      const targetGlow = level.actualLevel > 0 && !eaten ? "0.28" : "0.10";
+      const dotOpacity = visited ? 0 : baseOpacity;
+      const fillOpacity = visited ? 0.12 : 1;
+      const targetGlow = level.actualLevel > 0 && !visited ? "0.28" : "0.10";
+      const snakeFill = trailAge === snakeTrail.length - 1
+        ? "rgba(247,247,248,0.98)"
+        : `rgba(123,231,127,${Math.min(0.72, 0.14 + trailPosition * 0.58).toFixed(2)})`;
+      const snakeStroke = trailAge === snakeTrail.length - 1
+        ? "rgba(255,255,255,0.22)"
+        : `rgba(103,255,141,${Math.min(0.36, 0.10 + trailPosition * 0.2).toFixed(2)})`;
 
       return `
-        <rect x="${rect.x}" y="${rect.y}" width="${CELL}" height="${CELL}" rx="7" fill="${eaten ? "rgba(17,18,22,0.92)" : palette.fill}" stroke="${eaten ? "rgba(255,255,255,0.02)" : palette.border}" />
+        <rect x="${rect.x}" y="${rect.y}" width="${CELL}" height="${CELL}" rx="7" fill="${visited ? "rgba(17,18,22,0.94)" : palette.fill}" stroke="${visited ? "rgba(255,255,255,0.02)" : palette.border}" />
         <circle cx="${cx}" cy="${cy}" r="${dotRadius}" fill="${palette.dot}" opacity="${dotOpacity}" style="filter: drop-shadow(0 0 6px rgba(120,255,140,${targetGlow}));" />
         <rect x="${rect.x + 1}" y="${rect.y + 1}" width="${CELL - 2}" height="${CELL - 2}" rx="6" fill="none" stroke="rgba(255,255,255,${(0.03 * fillOpacity).toFixed(2)})" />
+        ${onSnake ? `<rect x="${rect.x + 2}" y="${rect.y + 2}" width="${CELL - 4}" height="${CELL - 4}" rx="6" fill="${snakeFill}" stroke="${snakeStroke}" style="filter: drop-shadow(0 0 8px rgba(126,255,145,${trailAge === snakeTrail.length - 1 ? "0.34" : "0.14"}));" />` : ""}
       `;
     })
     .join("");
 
-  const head = pointAt(route.points, progress);
   const glow = `
-    <circle cx="${head.x.toFixed(2)}" cy="${head.y.toFixed(2)}" r="22" fill="rgba(111,255,145,0.10)" />
-    <circle cx="${head.x.toFixed(2)}" cy="${head.y.toFixed(2)}" r="14" fill="#f7f7f8" />
-    <circle cx="${head.x.toFixed(2)}" cy="${head.y.toFixed(2)}" r="8" fill="#7be77f" />
+    <circle cx="${headCx.toFixed(2)}" cy="${headCy.toFixed(2)}" r="22" fill="rgba(111,255,145,0.12)" />
+    <circle cx="${headCx.toFixed(2)}" cy="${headCy.toFixed(2)}" r="11" fill="#f7f7f8" stroke="rgba(126,255,145,0.35)" stroke-width="1.5" />
+    <circle cx="${headCx - 3.5}" cy="${headCy - 1}" r="1.4" fill="#111112" />
+    <circle cx="${headCx + 3.5}" cy="${headCy - 1}" r="1.4" fill="#111112" />
   `;
 
   return `
@@ -341,8 +330,8 @@ function renderSvg({ profile, repos, cells, frameIndex, route }) {
         <tspan x="72" dy="54">Snake</tspan>
       </text>
       <text x="72" y="292" fill="#a4a4ab" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="18" font-weight="600">
-        <tspan x="72" dy="0">Recent commits become food.</tspan>
-        <tspan x="72" dy="28">The trail eats the graph day by day.</tspan>
+        <tspan x="72" dy="0">Largest commits become food.</tspan>
+        <tspan x="72" dy="28">Every square the snake crosses gets eaten.</tspan>
       </text>
       <text x="72" y="396" fill="#6f6f76" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="14" font-weight="600">
         ${escapeXml(profile.name || profile.login || USERNAME)}
@@ -351,13 +340,12 @@ function renderSvg({ profile, repos, cells, frameIndex, route }) {
         @${escapeXml(profile.login || USERNAME)}
       </text>
       <text x="72" y="456" fill="#6f6f76" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12" font-weight="600">
-        ${formatNumber(profile.public_repos)} repos · ${formatNumber(profile.followers)} followers · ${formatNumber(getTotalStars(repos))} stars
+        ${formatNumber(profile.public_repos)} repos | ${formatNumber(profile.followers)} followers | ${formatNumber(getTotalStars(repos))} stars
       </text>
       <rect x="${BOARD_X - 22}" y="${BOARD_Y - 22}" width="${BOARD_WIDTH + 44}" height="${BOARD_HEIGHT + 44}" rx="28" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.08)" />
       <rect x="${BOARD_X - 12}" y="${BOARD_Y - 12}" width="${BOARD_WIDTH + 24}" height="${BOARD_HEIGHT + 24}" rx="24" fill="rgba(0,0,0,0.14)" />
       ${boardCells}
-      <circle cx="${head.x.toFixed(2)}" cy="${head.y.toFixed(2)}" r="30" fill="url(#glow)" opacity="0.42"/>
-      ${body.join("")}
+      <circle cx="${headCx.toFixed(2)}" cy="${headCy.toFixed(2)}" r="30" fill="url(#glow)" opacity="0.42"/>
       ${glow}
     </svg>
   `;
@@ -377,6 +365,7 @@ async function main() {
 
   const cells = buildActivityCells(contributionDays, repoCommits, repos);
   const route = buildSnakeRoute(cells);
+  const frameCount = Math.max(route.stepCells.length + 12, 1);
 
   const browser = await puppeteer.launch({
     headless: "new",
@@ -392,7 +381,7 @@ async function main() {
     );
 
     const frames = [];
-    for (let frameIndex = 0; frameIndex < FRAME_COUNT; frameIndex += 1) {
+    for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
       const svg = renderSvg({ profile, repos, cells, frameIndex, route });
       await page.evaluate((markup) => {
         document.getElementById("root").innerHTML = markup;
@@ -407,7 +396,7 @@ async function main() {
     gif.writeFrame(firstIndexed, WIDTH, HEIGHT, {
       palette: firstPalette,
       delay: FRAME_MS,
-      repeat: 0,
+      repeat: -1,
     });
 
     for (let index = 1; index < frames.length; index += 1) {
